@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temporizador de Panadería</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Carga de Tone.js para el sonido de alerta -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Usando la fuente Inter para una apariencia moderna */
+        @import url('https://fonts?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent; /* Mejora la experiencia táctil */
+        }
+        
+        /* ========================================
+        SISTEMA DE TEMAS CSS (Variables)
+        ========================================
+        */
+        :root {
+            /* Colores predeterminados (Original/Indigo) - Estos se redefinen en JS */
+            --color-bg-primary: 31, 41, 55;   /* gray-900 / gray-800 */
+            --color-bg-secondary: 55, 65, 81; /* gray-800 / gray-700 */
+            --color-primary: 129, 140, 248;   /* indigo-400 (titles) */
+            --color-accent: 99, 102, 241;    /* indigo-500 (progress) */
+            --color-timer-start: 79, 70, 229;  /* indigo-600 (start button) */
+            --color-timer-pause: 202, 138, 4;  /* yellow-600 (pause button) */
+            --color-proofing: 52, 211, 163;    /* green-400 (proofing titles) */
+            --color-proofing-start: 16, 185, 129; /* green-600 (proofing button) */
+        }
+        
+        /* Aplicar variables a las clases de Tailwind */
+        .bg-custom-primary { background-color: rgb(var(--color-bg-primary)); }
+        .bg-custom-secondary { background-color: rgb(var(--color-bg-secondary)); }
+        .text-custom-primary { color: rgb(var(--color-primary)); }
+        .bg-custom-accent { background-color: rgb(var(--color-accent)); }
+        .focus-ring-custom-accent:focus { --tw-ring-color: rgb(var(--color-accent)); }
+        
+        .bg-timer-start { background-color: rgb(var(--color-timer-start)); }
+        .hover-bg-timer-start:hover { background-color: rgb(var(--color-timer-start), 0.8); }
+        .focus-ring-timer-start:focus { --tw-ring-color: rgb(var(--color-timer-start)); }
+
+        .bg-timer-pause { background-color: rgb(var(--color-timer-pause)); }
+        .hover-bg-timer-pause:hover { background-color: rgb(var(--color-timer-pause), 0.8); }
+        .focus-ring-timer-pause:focus { --tw-ring-color: rgb(var(--color-timer-pause)); }
+        
+        .text-proofing { color: rgb(var(--color-proofing)); }
+        .bg-proofing-start { background-color: rgb(var(--color-proofing-start)); }
+        .hover-bg-proofing-start:hover { background-color: rgb(var(--color-proofing-start), 0.8); }
+        .focus-ring-proofing-start:focus { --tw-ring-color: rgb(var(--color-proofing-start)); }
+
+
+        /* Estilos personalizados para los inputs de tiempo */
+        .time-input {
+            appearance: textfield; /* Para ocultar flechas en Firefox */
+        }
+        .time-input::-webkit-outer-spin-button,
+        .time-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Clase para inputs de leudado que solo aceptan minutos */
+        .proofing-input {
+            appearance: textfield;
+            max-width: 5rem;
+            min-width: 3rem;
+        }
+        .proofing-input::-webkit-outer-spin-button,
+        .proofing-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        /* Animación de la barra de progreso (opcional pero genial) */
+        @keyframes pulse-finish {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .animate-pulse-finish {
+            animation: pulse-finish 1s infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex flex-col items-center p-4 transition-colors duration-500">
+
+    <!-- Botón de Cambio de Tema (Pincel) -->
+    <button id="theme-toggle" class="fixed top-4 right-4 z-10 p-3 bg-gray-700 text-white rounded-full shadow-lg hover:bg-gray-600 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-yellow-400">
+        <!-- Ícono de Pincel (SVG Inline) -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+            <path d="M11.536 2.455a.75.75 0 0 0-.872 0l-5.233 3.868A.75.75 0 0 0 5.25 7.156v11.79c0 .416.336.754.75.754H7.5v-7.5a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 .75.75v7.5h.75a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 0 .75.75h2.25a.75.75 0 0 0 .75-.75v-3.75a.75.75 0 0 1 .75-.75h.75a.75.75 0 0 1 .75.75v7.5h.75a.75.75 0 0 0 .75-.75v-11.79a.75.75 0 0 0-.381-.633l-5.233-3.868Z" />
+        </svg>
+
+    </button>
+    
+
+    <!-- Contenedor Principal del Temporizador -->
+    <div class="w-full max-w-lg bg-custom-primary rounded-2xl shadow-2xl p-6 md:p-8 transition-colors duration-500">
+        <div class="flex flex-col items-center mb-6">
+            <!-- LOGO: Imagen del Reloj de Croissants/Baguettes -->
+            <img 
+                src="https://i.postimg.cc/kXRLYyWW/Chat-GPT-Image-20-oct-2025-11-33-17-a-m.png"
+                alt="Logo: Reloj con un croissant como fondo."
+                class="w-24 h-24 mb-3 rounded-2xl shadow-lg border-4 border-yellow-300 object-cover"
+                onerror="this.onerror=null; this.src='https://placehold.co/100x100/fbd38d/a0522d?text=BAKERY';" 
+            />
+            
+            <h1 class="text-3xl font-extrabold text-center text-custom-primary">
+                TIMEBAGUETTE
+            </h1>
+            <p class="text-sm text-gray-400">Temporizador de Panadería</p>
+        </div>
+
+        <!-- Campo de Entrada de Tiempo (Principal) -->
+        <div id="input-container" class="flex justify-center space-x-4 mb-8 transition duration-300">
+            <div class="flex flex-col items-center">
+                <!-- Valor inicial CERO -->
+                <input type="number" id="minutes-input" value="0" min="0" max="99" class="time-input w-20 md:w-24 text-6xl md:text-7xl bg-custom-secondary text-center rounded-xl p-2 focus:ring-4 focus-ring-custom-accent focus:outline-none transition duration-150" placeholder="00">
+                <label for="minutes-input" class="text-gray-400 mt-2 text-sm">Minutos</label>
+            </div>
+            <div class="text-6xl md:text-7xl font-light text-gray-500">:</div>
+            <div class="flex flex-col items-center">
+                <!-- Valor inicial CERO -->
+                <input type="number" id="seconds-input" value="0" min="0" max="59" class="time-input w-20 md:w-24 text-6xl md:text-7xl bg-custom-secondary text-center rounded-xl p-2 focus:ring-4 focus-ring-custom-accent focus:outline-none transition duration-150" placeholder="00">
+                <label for="seconds-input" class="text-gray-400 mt-2 text-sm">Segundos</label>
+            </div>
+        </div>
+
+        <!-- Pantalla de Cuenta Regresiva (Principal) -->
+        <div id="display-container" class="hidden flex flex-col items-center mb-8">
+            <div id="timer-display" class="text-8xl font-extrabold text-white mb-1 tracking-tight">
+                00:00
+            </div>
+            <!-- REFERENCIA DEL TIEMPO TOTAL -->
+            <div id="total-time-display" class="text-lg font-medium text-gray-400 mb-4">
+                Total: 00:00
+            </div>
+            <!-- Barra de Progreso (simulada con un div que se encoge) -->
+            <div class="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div id="progress-bar" class="h-full bg-custom-accent transition-none" style="width: 100%;"></div>
+            </div>
+        </div>
+        
+        <!-- Botones de Tiempo Predeterminados (CON ICONOS) -->
+        <div id="preset-buttons" class="flex flex-wrap justify-center gap-4 mb-6">
+            <div class="flex flex-col items-center">
+                <button data-minutes="8" class="preset-btn w-20 px-4 py-2 bg-custom-secondary hover-bg-timer-start text-sm font-medium rounded-xl transition duration-150 active:scale-95 focus:outline-none focus:ring-2 focus-ring-custom-accent">8 min</button>
+                <div class="text-xl mt-1" title="Bollito de pan">🍞</div>
+            </div>
+            <div class="flex flex-col items-center">
+                <button data-minutes="10" class="preset-btn w-20 px-4 py-2 bg-custom-secondary hover-bg-timer-start text-sm font-medium rounded-xl transition duration-150 active:scale-95 focus:outline-none focus:ring-2 focus-ring-custom-accent">10 min</button>
+                <div class="text-xl mt-1" title="Croissant">🥐</div>
+            </div>
+            <div class="flex flex-col items-center">
+                <button data-minutes="15" class="preset-btn w-20 px-4 py-2 bg-custom-secondary hover-bg-timer-start text-sm font-medium rounded-xl transition duration-150 active:scale-95 focus:outline-none focus:ring-2 focus-ring-custom-accent">15 min</button>
+                <div class="text-xl mt-1" title="Baguette">🥖</div>
+            </div>
+        </div>
+
+
+        <!-- Controles/Botones (Principal) -->
+        <div class="flex justify-center space-x-3 md:space-x-4">
+            <button id="start-button" class="flex-1 px-4 py-3 bg-timer-start hover-bg-timer-start text-white font-semibold rounded-xl shadow-lg transition duration-200 focus:outline-none focus:ring-4 focus-ring-timer-start active:scale-95">
+                INICIAR
+            </button>
+            <button id="pause-button" class="flex-1 px-4 py-3 bg-timer-pause hover-bg-timer-pause text-white font-semibold rounded-xl shadow-lg transition duration-200 focus:outline-none focus:ring-4 focus-ring-timer-pause active:scale-95" disabled>
+                PAUSAR
+            </button>
+            <button id="reset-button" class="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl shadow-lg transition duration-200 focus:outline-none focus:ring-4 focus:ring-red-500 active:scale-95">
+                REINICIAR
+            </button>
+        </div>
+
+        <!-- Mensaje de Estado (Para alertas) -->
+        <div id="message-box" class="mt-6 h-8 text-center text-lg font-medium text-green-400 opacity-0 transition-opacity duration-300"></div>
+
+        <!-- SECCIÓN DE TEMPORIZADORES SECUNDARIOS (LEUDANDO) -->
+        <div class="mt-8 pt-6 border-t border-gray-700">
+            <h2 class="text-2xl font-bold text-center mb-4 text-proofing">
+                🌱 Temporizadores de Leudado
+            </h2>
+            
+            <div id="proofing-timers-container" class="space-y-4">
+                <!-- Proofing Timer 1 -->
+                <div id="proofing-timer-1" data-id="1" class="proofing-timer-card bg-custom-secondary p-4 rounded-xl shadow-lg">
+                    <input type="text" value="Masa 1" class="proofing-name-input font-semibold text-lg mb-2 w-full bg-gray-600 text-gray-200 rounded-lg p-1 px-2 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Nombre de la Masa">
+                    <div class="flex items-center justify-between space-x-3">
+                        <div class="flex flex-col items-center">
+                            <input type="number" min="1" value="60" class="proofing-input w-16 text-2xl bg-gray-600 text-center rounded-lg p-1 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Min">
+                            <label class="text-xs text-gray-400 mt-1">Minutos</label>
+                        </div>
+                        
+                        <div class="proofing-display text-2xl md:text-3xl font-bold text-white flex-1 text-center">01:00:00</div>
+                        
+                        <button class="proofing-start-btn w-20 px-3 py-1 bg-proofing-start hover-bg-proofing-start text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95">Iniciar</button>
+                        <button class="proofing-reset-btn w-16 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95" disabled>Reset</button>
+                    </div>
+                </div>
+                <!-- Proofing Timer 2 -->
+                <div id="proofing-timer-2" data-id="2" class="proofing-timer-card bg-custom-secondary p-4 rounded-xl shadow-lg">
+                    <input type="text" value="Masa 2" class="proofing-name-input font-semibold text-lg mb-2 w-full bg-gray-600 text-gray-200 rounded-lg p-1 px-2 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Nombre de la Masa">
+                    <div class="flex items-center justify-between space-x-3">
+                        <div class="flex flex-col items-center">
+                            <input type="number" min="1" value="60" class="proofing-input w-16 text-2xl bg-gray-600 text-center rounded-lg p-1 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Min">
+                            <label class="text-xs text-gray-400 mt-1">Minutos</label>
+                        </div>
+                        
+                        <div class="proofing-display text-2xl md:text-3xl font-bold text-white flex-1 text-center">01:00:00</div>
+                        
+                        <button class="proofing-start-btn w-20 px-3 py-1 bg-proofing-start hover-bg-proofing-start text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95">Iniciar</button>
+                        <button class="proofing-reset-btn w-16 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95" disabled>Reset</button>
+                    </div>
+                </div>
+                <!-- Proofing Timer 3 -->
+                <div id="proofing-timer-3" data-id="3" class="proofing-timer-card bg-custom-secondary p-4 rounded-xl shadow-lg">
+                    <input type="text" value="Masa 3" class="proofing-name-input font-semibold text-lg mb-2 w-full bg-gray-600 text-gray-200 rounded-lg p-1 px-2 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Nombre de la Masa">
+                    <div class="flex items-center justify-between space-x-3">
+                        <div class="flex flex-col items-center">
+                            <input type="number" min="1" value="60" class="proofing-input w-16 text-2xl bg-gray-600 text-center rounded-lg p-1 focus:ring-2 focus-ring-proofing-start focus:outline-none" placeholder="Min">
+                            <label class="text-xs text-gray-400 mt-1">Minutos</label>
+                        </div>
+                        
+                        <div class="proofing-display text-2xl md:text-3xl font-bold text-white flex-1 text-center">01:00:00</div>
+                        
+                        <button class="proofing-start-btn w-20 px-3 py-1 bg-proofing-start hover-bg-proofing-start text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95">Iniciar</button>
+                        <button class="proofing-reset-btn w-16 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition duration-150 active:scale-95" disabled>Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pie de página para instrucciones móviles -->
+        <p class="text-center text-xs text-gray-500 mt-8">
+            Guarda esto en tu pantalla de inicio para usarlo como una app nativa.
+        </p>
+    </div>
+
+    <script>
+        // Definición de Temas
+        const themes = {
+            'original': {
+                '--color-bg-primary': '31, 41, 55',   // gray-800
+                '--color-bg-secondary': '55, 65, 81', // gray-700
+                '--color-primary': '129, 140, 248',   // indigo-400 (titles)
+                '--color-accent': '99, 102, 241',    // indigo-500 (progress)
+                '--color-timer-start': '79, 70, 229',  // indigo-600 (start button)
+                '--color-timer-pause': '202, 138, 4',  // yellow-600 (pause button)
+                '--color-proofing': '52, 211, 163',    // green-400 (proofing titles)
+                '--color-proofing-start': '16, 185, 129' // green-600 (proofing button)
+            },
+            'berry-bliss': {
+                '--color-bg-primary': '43, 6, 21',    // custom dark magenta
+                '--color-bg-secondary': '79, 10, 36', // custom medium magenta
+                '--color-primary': '255, 163, 206',   // pink-300 (titles)
+                '--color-accent': '236, 72, 153',    // pink-500 (progress)
+                '--color-timer-start': '217, 70, 239', // fuchsia-500 (start button)
+                '--color-timer-pause': '252, 211, 77', // amber-300 (pause button)
+                '--color-proofing': '168, 85, 247',    // purple-400 (proofing titles)
+                '--color-proofing-start': '147, 51, 234' // purple-600 (proofing button)
+            },
+            'aqua-fresh': {
+                '--color-bg-primary': '20, 30, 48',   // custom deep blue
+                '--color-bg-secondary': '30, 41, 59', // custom light blue-gray
+                '--color-primary': '103, 232, 249',   // cyan-300 (titles)
+                '--color-accent': '6, 182, 212',     // cyan-500 (progress)
+                '--color-timer-start': '59, 130, 246', // blue-500 (start button)
+                '--color-timer-pause': '249, 115, 22', // orange-600 (pause button)
+                '--color-proofing': '34, 197, 94',    // green-500 (proofing titles)
+                '--color-proofing-start': '21, 128, 61' // green-700 (proofing button)
+            }
+        };
+
+        const themeKeys = Object.keys(themes);
+        let currentThemeIndex = 0;
+        
+        // Función para aplicar el tema
+        const applyTheme = (themeName) => {
+            const root = document.documentElement;
+            const theme = themes[themeName];
+            
+            // Aplicar variables CSS
+            for (const [key, value] of Object.entries(theme)) {
+                root.style.setProperty(key, value);
+            }
+
+            // Establecer el color de fondo del body explícitamente para el tema actual
+            const body = document.body;
+            let bgColor = '';
+            if (themeName === 'original') bgColor = 'rgb(31, 41, 55)';
+            else if (themeName === 'berry-bliss') bgColor = 'rgb(43, 6, 21)';
+            else if (themeName === 'aqua-fresh') bgColor = 'rgb(20, 30, 48)';
+            body.style.backgroundColor = bgColor;
+        };
+
+        // Función para cambiar al siguiente tema
+        const toggleTheme = () => {
+            currentThemeIndex = (currentThemeIndex + 1) % themeKeys.length;
+            const nextThemeName = themeKeys[currentThemeIndex];
+            applyTheme(nextThemeName);
+        };
+        
+        // Evento para el botón de cambio de tema
+        const themeToggleButton = document.getElementById('theme-toggle');
+        themeToggleButton.addEventListener('click', toggleTheme);
+
+
+        // Elementos del DOM (Temporizador Principal)
+        const minutesInput = document.getElementById('minutes-input');
+        const secondsInput = document.getElementById('seconds-input');
+        const startButton = document.getElementById('start-button');
+        const pauseButton = document.getElementById('pause-button');
+        const resetButton = document.getElementById('reset-button');
+        const timerDisplay = document.getElementById('timer-display');
+        const totalTimeDisplay = document.getElementById('total-time-display');
+        const inputContainer = document.getElementById('input-container');
+        const displayContainer = document.getElementById('display-container');
+        const progressBar = document.getElementById('progress-bar');
+        const messageBox = document.getElementById('message-box');
+        const presetButtons = document.querySelectorAll('.preset-btn'); 
+
+        // Estado del Temporizador Principal
+        let timerInterval = null;
+        let totalSeconds = 0;
+        let timeRemaining = 0;
+        let isPaused = false;
+        let isRunning = false;
+
+        // --- ESTADO DE TEMPORIZADORES DE LEUDADO ---
+        const proofingTimers = [
+            { id: 1, name: "Masa 1", interval: null, remaining: 0, total: 0, isRunning: false, elements: {} },
+            { id: 2, name: "Masa 2", interval: null, remaining: 0, total: 0, isRunning: false, elements: {} },
+            { id: 3, name: "Masa 3", interval: null, remaining: 0, total: 0, isRunning: false, elements: {} }
+        ];
+        
+        // Configuración de audio
+        let synth = null;
+        
+        // Función de utilidad para añadir un cero inicial (05, 10, etc.)
+        const pad = (num) => num.toString().padStart(2, '0');
+
+        // Formatea segundos a HH:MM:SS (usado para Leudado)
+        const formatTimeProofing = (seconds) => {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            return `${pad(hrs)}:${pad(mins)}:${pad(secs)}`;
+        };
+        
+        // Inicializa el sintetizador de sonido de Tone.js (Global)
+        const initializeAudio = () => {
+            if (!synth) {
+                // Configura un sintetizador básico (sinusoidal)
+                synth = new Tone.Synth({
+                    oscillator: { type: "sine" },
+                    envelope: {
+                        attack: 0.005,
+                        decay: 0.1,
+                        sustain: 0.0,
+                        release: 0.5
+                    }
+                }).toDestination();
+                // Adjuntar listener a todos los botones que inician un timer para habilitar el audio
+                document.querySelectorAll('#start-button, .preset-btn, .proofing-start-btn').forEach(button => {
+                    button.addEventListener('click', () => {
+                        if (Tone.context.state !== 'running') {
+                             Tone.start().catch(e => console.error("Error al iniciar el contexto de audio:", e));
+                        }
+                    }, { once: true });
+                });
+            }
+        };
+
+        // --- LÓGICA DEL TEMPORIZADOR PRINCIPAL ---
+
+        // Actualiza la pantalla y la barra de progreso
+        const updateDisplay = () => {
+            const mins = Math.floor(timeRemaining / 60);
+            const secs = timeRemaining % 60;
+            timerDisplay.textContent = `${pad(mins)}:${pad(secs)}`;
+
+            const progressPercentage = (timeRemaining / totalSeconds) * 100;
+            progressBar.style.width = `${progressPercentage}%`;
+            
+            if (timeRemaining <= 10 && timeRemaining > 0 && isRunning) {
+                timerDisplay.classList.add('text-red-400');
+            } else {
+                timerDisplay.classList.remove('text-red-400');
+            }
+        };
+
+        const startTimer = () => {
+            initializeAudio();
+
+            if (!isRunning) {
+                if (!isPaused) {
+                    const minutes = parseInt(minutesInput.value) || 0;
+                    const seconds = parseInt(secondsInput.value) || 0;
+                    
+                    // --- ALMACENAR Y MOSTRAR TIEMPO TOTAL ---
+                    totalSeconds = minutes * 60 + seconds;
+                    timeRemaining = totalSeconds;
+                    
+                    if (totalSeconds <= 0) {
+                        showMessage("¡Ingresa un tiempo válido en el temporizador principal!", 'red');
+                        return;
+                    }
+
+                    // Actualizar el display total
+                    totalTimeDisplay.textContent = `Total: ${pad(minutes)}:${pad(seconds)}`; 
+                    
+                    // Asegurar que la barra de progreso esté al 100% al inicio
+                    progressBar.style.transition = 'none';
+                    progressBar.style.width = '100%';
+                    // La transición se aplicará en el primer `updateDisplay` implícitamente
+                    // pero para precisión visual, se puede re-aplicar:
+                    setTimeout(() => {
+                        progressBar.style.transition = `width ${totalSeconds}s linear`;
+                    }, 10);
+                }
+                
+                inputContainer.classList.add('hidden');
+                displayContainer.classList.remove('hidden');
+
+                isRunning = true;
+                isPaused = false;
+                startButton.textContent = 'INICIADO';
+                startButton.disabled = true;
+                pauseButton.textContent = 'PAUSAR';
+                pauseButton.disabled = false;
+                resetButton.disabled = false;
+                
+                timerInterval = setInterval(() => {
+                    timeRemaining--;
+                    updateDisplay();
+
+                    if (timeRemaining <= 0) {
+                        clearInterval(timerInterval);
+                        timerFinished();
+                    }
+                }, 1000);
+            }
+        };
+
+        const pauseTimer = () => {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                isPaused = true;
+
+                // Congelar la barra de progreso quitando la transición
+                progressBar.style.transition = 'none';
+
+                startButton.textContent = 'REANUDAR';
+                startButton.disabled = false;
+                pauseButton.disabled = true;
+                pauseButton.textContent = 'PAUSADO';
+                showMessage("Temporizador principal en pausa", 'yellow');
+            }
+        };
+
+        const resetTimer = () => {
+            clearInterval(timerInterval);
+            isRunning = false;
+            isPaused = false;
+            totalSeconds = 0;
+            timeRemaining = 0;
+            
+            // Inicializar a 00:00 para el reinicio
+            minutesInput.value = '0';
+            secondsInput.value = '0';
+            timerDisplay.textContent = '00:00';
+            totalTimeDisplay.textContent = 'Total: 00:00'; 
+
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '100%';
+
+            inputContainer.classList.remove('hidden');
+            displayContainer.classList.add('hidden');
+
+            startButton.textContent = 'INICIAR';
+            startButton.disabled = false;
+            pauseButton.textContent = 'PAUSAR';
+            pauseButton.disabled = true;
+            resetButton.disabled = true;
+            timerDisplay.classList.remove('text-red-400');
+            showMessage("Establece un tiempo o usa un preset", 'gray');
+        };
+
+        const timerFinished = () => {
+            isRunning = false;
+            
+            if (synth) {
+                synth.triggerAttackRelease("C5", "4n"); // Tono de alerta principal
+            }
+            
+            if (navigator.vibrate) {
+                navigator.vibrate([1000, 500, 1000]); 
+            }
+
+            timerDisplay.textContent = '¡00:00!';
+            startButton.disabled = true;
+            pauseButton.disabled = true;
+            resetButton.disabled = false; 
+            progressBar.classList.add('animate-pulse-finish', 'bg-red-500'); // Efecto visual de fin
+            progressBar.style.width = '100%';
+
+            showMessage("¡Tiempo principal terminado!", 'green');
+        };
+        
+        const showMessage = (message, type) => {
+            messageBox.textContent = message;
+            messageBox.classList.remove('text-green-400', 'text-red-400', 'text-yellow-400', 'text-gray-400');
+            if (type === 'green') messageBox.classList.add('text-green-400');
+            if (type === 'red') messageBox.classList.add('text-red-400');
+            if (type === 'yellow') messageBox.classList.add('text-yellow-400');
+            if (type === 'gray') messageBox.classList.add('text-gray-400');
+            messageBox.classList.remove('opacity-0');
+            
+            setTimeout(() => {
+                 // Solo ocultar si no es un mensaje de terminación
+                 if (!messageBox.textContent.includes("terminado") && !isPaused && !isRunning) {
+                    messageBox.classList.add('opacity-0');
+                }
+            }, 3000);
+        };
+        
+        const setAndStartTimer = (minutes) => {
+            if (isRunning || isPaused) {
+                resetTimer();
+            }
+            
+            minutesInput.value = minutes.toString();
+            secondsInput.value = '0'; 
+            
+            startTimer();
+        };
+        
+        // --- LÓGICA DE TEMPORIZADORES DE LEUDADO (SECUNDARIOS) ---
+
+        const getProofingElements = (id) => {
+            const card = document.querySelector(`#proofing-timer-${id}`);
+            return {
+                nameInput: card.querySelector('.proofing-name-input'),
+                input: card.querySelector('.proofing-input'),
+                display: card.querySelector('.proofing-display'),
+                startBtn: card.querySelector('.proofing-start-btn'),
+                resetBtn: card.querySelector('.proofing-reset-btn'),
+                card: card
+            };
+        };
+
+        const updateProofingDisplay = (timer) => {
+            timer.elements.display.textContent = formatTimeProofing(timer.remaining);
+            
+            // Efecto de parpadeo en los últimos 5 minutos
+            if (timer.remaining <= 300 && timer.remaining > 0) {
+                 timer.elements.display.classList.add('text-yellow-400', 'font-extrabold');
+            } else {
+                 timer.elements.display.classList.remove('text-yellow-400', 'font-extrabold');
+            }
+        };
+
+        const proofingTimerFinished = (timer) => {
+            timer.isRunning = false;
+            clearInterval(timer.interval);
+            
+            // Obtener el nombre para el mensaje de alerta
+            const massName = timer.elements.nameInput.value || `Masa ${timer.id}`;
+
+            timer.elements.startBtn.textContent = '¡FIN!';
+            timer.elements.startBtn.disabled = true;
+            timer.elements.resetBtn.disabled = false;
+            timer.elements.card.classList.add('bg-green-600', 'animate-pulse-finish');
+            
+            showMessage(`¡Leudado de "${massName}" terminado!`, 'green');
+            
+            if (synth) {
+                // Tono de alerta diferente para leudado
+                synth.triggerAttackRelease("G4", "2n", Tone.now()); 
+                synth.triggerAttackRelease("G3", "2n", Tone.now() + 0.5); 
+            }
+            if (navigator.vibrate) {
+                navigator.vibrate([500, 300, 500]); 
+            }
+        };
+
+        const startProofingTimer = (timer) => {
+            initializeAudio();
+
+            // Si está corriendo, se pausa (toggle)
+            if (timer.isRunning) {
+                clearInterval(timer.interval);
+                timer.isRunning = false;
+                timer.elements.startBtn.textContent = 'Reanudar';
+                showMessage(`${timer.elements.nameInput.value || `Masa ${timer.id}`} pausada.`, 'yellow');
+                return;
+            }
+            
+            // Lógica de inicio o reanudación
+            if (timer.remaining === 0 || timer.interval === null) {
+                const minutes = parseInt(timer.elements.input.value) || 60; 
+                timer.total = minutes * 60;
+                timer.remaining = timer.total;
+                
+                if (timer.total <= 0) {
+                    const massName = timer.elements.nameInput.value || `Masa ${timer.id}`;
+                    showMessage(`${massName}: ¡Ingresa un tiempo válido (mínimo 1 minuto)!`, 'red');
+                    return;
+                }
+            }
+            
+            // Deshabilitar la edición del nombre y minutos mientras corre
+            timer.elements.nameInput.disabled = true;
+            timer.elements.input.disabled = true;
+            timer.elements.card.classList.remove('bg-green-600', 'animate-pulse-finish');
+
+
+            timer.isRunning = true;
+            timer.elements.startBtn.textContent = 'Pausar';
+            timer.elements.resetBtn.disabled = false;
+            
+            // Asegurarse de que el display inicial esté correcto
+            updateProofingDisplay(timer); 
+
+            timer.interval = setInterval(() => {
+                timer.remaining--;
+                updateProofingDisplay(timer);
+
+                if (timer.remaining <= 0) {
+                    proofingTimerFinished(timer);
+                }
+            }, 1000);
+        };
+
+        const resetProofingTimer = (timer) => {
+            clearInterval(timer.interval);
+            timer.isRunning = false;
+            timer.interval = null; // Marcar como reiniciado
+            timer.remaining = 0;
+            
+            const initialMinutes = parseInt(timer.elements.input.value) || 60;
+            const initialTimeDisplay = formatTimeProofing(initialMinutes * 60);
+
+            timer.elements.display.textContent = initialTimeDisplay;
+            timer.elements.startBtn.textContent = 'Iniciar';
+            timer.elements.startBtn.disabled = false;
+            timer.elements.resetBtn.disabled = true;
+            timer.elements.nameInput.disabled = false;
+            timer.elements.input.disabled = false;
+            timer.elements.display.classList.remove('text-yellow-400', 'font-extrabold');
+            timer.elements.card.classList.remove('bg-green-600', 'animate-pulse-finish');
+            showMessage(`${timer.elements.nameInput.value || `Masa ${timer.id}`} reiniciada.`, 'gray');
+        };
+        
+        // --- INICIALIZACIÓN Y BINDING DE EVENTOS ---
+        
+        const initializeProofingTimers = () => {
+            proofingTimers.forEach(timer => {
+                // 1. Obtener referencias de elementos
+                timer.elements = getProofingElements(timer.id);
+                
+                // 2. Establecer el display inicial
+                const initialMinutes = parseInt(timer.elements.input.value) || 60;
+                timer.elements.display.textContent = formatTimeProofing(initialMinutes * 60);
+
+                // 3. Bindear eventos
+                timer.elements.startBtn.addEventListener('click', () => startProofingTimer(timer));
+                timer.elements.resetBtn.addEventListener('click', () => resetProofingTimer(timer));
+                
+                // 4. Asegurar que los inputs solo permitan números positivos y se inicialicen
+                timer.elements.input.addEventListener('change', (e) => {
+                    const value = parseInt(e.target.value);
+                    if (value < 1) e.target.value = 1;
+                    // Actualizar el display al cambiar el input solo si el timer no está corriendo
+                    if (!timer.isRunning) {
+                        const newMinutes = parseInt(e.target.value);
+                        timer.elements.display.textContent = formatTimeProofing(newMinutes * 60);
+                    }
+                });
+            });
+        };
+
+
+        window.onload = function() {
+            // Inicializar el tema al cargar
+            applyTheme(themeKeys[0]);
+
+            // Binding de eventos del Temporizador Principal
+            startButton.addEventListener('click', startTimer);
+            pauseButton.addEventListener('click', pauseTimer);
+            resetButton.addEventListener('click', resetTimer);
+
+            // Binding de botones preestablecidos
+            presetButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const minutes = parseInt(button.dataset.minutes);
+                    setAndStartTimer(minutes);
+                });
+            });
+            
+            // Asegurar que el input de segundos sea 0-59
+            secondsInput.addEventListener('change', (e) => {
+                const val = parseInt(e.target.value);
+                if (val < 0) e.target.value = 0;
+                else if (val > 59) e.target.value = 59;
+                e.target.value = pad(e.target.value);
+            });
+            // Asegurar que el input de minutos sea positivo
+            minutesInput.addEventListener('change', (e) => {
+                const val = parseInt(e.target.value);
+                if (val < 0) e.target.value = 0;
+            });
+
+
+            // Inicializar Temporizadores de Leudado
+            initializeProofingTimers();
+            
+            // Estado inicial del botón de Reiniciar
+            resetButton.disabled = true;
+
+            // Mensaje de bienvenida inicial
+            showMessage("¡Listo para hornear! 🍞", 'gray');
+        };
+
+    </script>
+</body>
+</html>
